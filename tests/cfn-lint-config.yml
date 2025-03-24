@@ -1,0 +1,18 @@
+templates:
+  - master-updated.yaml
+  - infrastructure/*.yaml
+  - services/**/*.yaml
+
+ignore_templates:
+  - master.yaml
+  - infrastructure/vpc.yaml
+  - infrastructure/security-groups.yaml
+  - infrastructure/load-balancers.yaml
+  - infrastructure/ecs-cluster.yaml
+  - infrastructure/lifecyclehook.yaml
+  - services/product-service/service.yaml
+  - services/website-service/service.yaml
+
+ignore_checks:
+  # Allow t4g and m6g instance types (Graviton)
+  - E2510

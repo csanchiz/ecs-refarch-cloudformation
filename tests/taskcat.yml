@@ -1,0 +1,23 @@
+project:
+  name: ecs-refarch-cloudformation
+  regions:
+    - us-east-1
+    - us-west-2
+    - eu-west-1
+  parameters:
+    EnvironmentType: Development
+
+tests:
+  graviton-ecs-cluster:
+    template: ./master-updated.yaml
+    regions:
+      - us-east-1
+    parameters:
+      EnvironmentType: Development
+    
+  graviton-production:
+    template: ./master-updated.yaml
+    regions:
+      - us-west-2
+    parameters:
+      EnvironmentType: Production

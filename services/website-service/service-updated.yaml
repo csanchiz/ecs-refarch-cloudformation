@@ -1,0 +1,263 @@
+Description: >
+  This template deploys a containerized website service using Amazon ECS with
+  Graviton processors for better price/performance and energy efficiency.
+
+Parameters:
+  VPC:
+    Description: The VPC that the ECS cluster is deployed to
+    Type: AWS::EC2::VPC::Id
+
+  Cluster:
+    Description: The ECS Cluster ID that this service should run on
+    Type: String
+
+  DesiredCount:
+    Description: How many instances of this task should we run across our cluster?
+    Type: Number
+    Default: 2
+
+  ProductServiceUrl:
+    Description: The URL of the Product Service API
+    Type: String
+
+  Listener:
+    Description: The Application Load Balancer listener to register with
+    Type: String
+
+  Path:
+    Description: The path to register with the Application Load Balancer
+    Type: String
+    Default: /
+
+  ECSServiceAutoScalingRoleARN:
+    Description: The ECS service auto scaling role ARN
+    Type: String
+
+  ContainerImage:
+    Description: The container image to use (must support ARM64 architecture)
+    Type: String
+    Default: public.ecr.aws/aws-containers/amazon-ecs-sample:latest
+
+  Architecture:
+    Description: The CPU architecture to use for the task
+    Type: String
+    Default: ARM64
+    AllowedValues: [ARM64, X86_64]
+
+Resources:
+  # Task Execution Role - Allows ECS to pull images and publish logs
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Task Role - Permissions for the container itself
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+      Policies:
+        - PolicyName: website-service-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'xray:PutTraceSegments'
+                  - 'xray:PutTelemetryRecords'
+                Resource: '*'
+
+  # CloudWatch Logs Group
+  CloudWatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${AWS::StackName}
+      RetentionInDays: 30
+
+  # Task Definition
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AWS::StackName}-website-service
+      RequiresCompatibilities:
+        - EC2
+      NetworkMode: bridge
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      Cpu: 256
+      Memory: 512
+      RuntimePlatform:
+        CpuArchitecture: !Ref Architecture
+        OperatingSystemFamily: LINUX
+      ContainerDefinitions:
+        - Name: website-service
+          Image: !Ref ContainerImage
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+              HostPort: 0
+              Protocol: tcp
+          Environment:
+            - Name: PRODUCT_SERVICE_URL
+              Value: !Ref ProductServiceUrl
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: ARCHITECTURE
+              Value: !Ref Architecture
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost/ || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudWatchLogsGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: website-service
+
+  # Target Group for ALB
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VPC
+      Port: 80
+      Protocol: HTTP
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+
+  # ALB Listener Rule
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 1
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - !Ref Path
+      Actions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+
+  # ECS Service
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: ListenerRule
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}-website-service
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      DesiredCount: !Ref DesiredCount
+      LoadBalancers:
+        - ContainerName: website-service
+          ContainerPort: 80
+          TargetGroupArn: !Ref TargetGroup
+      PlacementStrategies:
+        - Type: spread
+          Field: attribute:ecs.availability-zone
+        - Type: spread
+          Field: instanceId
+      PlacementConstraints:
+        - Type: memberOf
+          Expression: "attribute:ecs.cpu-architecture == ARM64"
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Architecture
+          Value: !Ref Architecture
+
+  # Auto Scaling for the service
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 10
+      MinCapacity: !Ref DesiredCount
+      ResourceId: !Join
+        - /
+        - - service
+          - !Ref Cluster
+          - !GetAtt Service.Name
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !Ref ECSServiceAutoScalingRoleARN
+
+  # CPU-based scaling policy
+  ScalingPolicyCPU:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-website-service-cpu-scaling
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+
+  # Request count-based scaling policy
+  ScalingPolicyRequestCount:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-website-service-request-scaling
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Join
+            - /
+            - - !GetAtt TargetGroup.LoadBalancerArns
+              - !GetAtt TargetGroup.TargetGroupArn
+        TargetValue: 1000
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+
+Outputs:
+  ServiceName:
+    Description: The name of the ECS service
+    Value: !GetAtt Service.Name
+    Export:
+      Name: !Sub ${AWS::StackName}-WebsiteServiceName
+
+  TaskDefinition:
+    Description: The task definition for the website service
+    Value: !Ref TaskDefinition
+    Export:
+      Name: !Sub ${AWS::StackName}-WebsiteServiceTaskDefinition
+      
+  Architecture:
+    Description: The CPU architecture being used
+    Value: !Ref Architecture
+    Export:
+      Name: !Sub ${AWS::StackName}-WebsiteServiceArchitecture

@@ -1,0 +1,126 @@
+Description: >
+  This template contains the security groups required by our entire stack.
+  We create them in a separate nested template, so they can be referenced
+  by all of the other nested templates.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC ID
+
+Resources:
+  # ALB Security Group
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the public facing load balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-LoadBalancers
+
+  # ECS Host Security Group
+  ECSHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the ECS hosts and the tasks/containers that run on them
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # Only allow inbound access from the ALB
+        - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+        # Allow ECS hosts to communicate with each other
+        - SourceSecurityGroupId: !Ref ECSHostSecurityGroup
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-ECS-Hosts
+
+  # ECS Service Security Group (for Fargate tasks)
+  ECSServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Fargate tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # Only allow inbound access from the ALB
+        - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-ECS-Services
+
+  # Add egress rules to security groups
+  LoadBalancerSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LoadBalancerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref ECSHostSecurityGroup
+      Description: Allow traffic to ECS hosts
+
+  LoadBalancerSecurityGroupEgressFargate:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LoadBalancerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref ECSServiceSecurityGroup
+      Description: Allow traffic to Fargate tasks
+
+  ECSHostSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ECSHostSecurityGroup
+      IpProtocol: -1
+      CidrIp: 0.0.0.0/0
+      Description: Allow all outbound traffic
+
+  ECSServiceSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ECSServiceSecurityGroup
+      IpProtocol: -1
+      CidrIp: 0.0.0.0/0
+      Description: Allow all outbound traffic
+
+Outputs:
+  LoadBalancerSecurityGroup:
+    Description: The security group for the load balancer
+    Value: !Ref LoadBalancerSecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-LoadBalancerSecurityGroup
+
+  ECSHostSecurityGroup:
+    Description: The security group for the ECS hosts
+    Value: !Ref ECSHostSecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-ECSHostSecurityGroup
+
+  ECSServiceSecurityGroup:
+    Description: The security group for the ECS services running on Fargate
+    Value: !Ref ECSServiceSecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-ECSServiceSecurityGroup

@@ -1,0 +1,231 @@
+Description: >
+  This template deploys a Lambda function and Auto Scaling Lifecycle Hook to drain
+  ECS tasks from container instances when they are being terminated.
+
+Parameters:
+  Cluster:
+    Description: The ECS cluster name
+    Type: String
+
+  ECSAutoScalingGroupName:
+    Description: The name of the Auto Scaling group for the ECS cluster
+    Type: String
+
+Resources:
+  # IAM Role for Lambda function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ecs-drain-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:CompleteLifecycleAction
+                  - autoscaling:DescribeAutoScalingInstances
+                  - ec2:DescribeInstances
+                  - ecs:DescribeContainerInstances
+                  - ecs:ListContainerInstances
+                  - ecs:UpdateContainerInstancesState
+                  - ecs:ListTasks
+                Resource: '*'
+
+  # CloudWatch Log Group for Lambda function
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-drain-ecs-instance
+      RetentionInDays: 30
+
+  # Lambda function to drain ECS tasks
+  DrainECSInstancesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-drain-ecs-instance
+      Description: Drain ECS tasks from container instances that are being terminated
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+      MemorySize: 128
+      Environment:
+        Variables:
+          CLUSTER: !Ref Cluster
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          import logging
+          import time
+
+          # Configure logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # Initialize clients
+          ecs = boto3.client('ecs')
+          autoscaling = boto3.client('autoscaling')
+          ec2 = boto3.client('ec2')
+
+          # Get environment variables
+          CLUSTER = os.environ['CLUSTER']
+
+          def lambda_handler(event, context):
+              logger.info("Received event: " + str(event))
+              
+              try:
+                  # Get instance ID from lifecycle event
+                  instance_id = event['detail']['EC2InstanceId']
+                  asg_name = event['detail']['AutoScalingGroupName']
+                  lifecycle_hook_name = event['detail']['LifecycleHookName']
+                  lifecycle_action_token = event['detail']['LifecycleActionToken']
+                  
+                  logger.info(f"Processing instance {instance_id} in ASG {asg_name}")
+                  
+                  # Get the container instance ID from the EC2 instance
+                  container_instance_id = get_container_instance_id(instance_id)
+                  
+                  if container_instance_id:
+                      # Set the container instance to DRAINING
+                      logger.info(f"Setting container instance {container_instance_id} to DRAINING")
+                      ecs.update_container_instances_state(
+                          cluster=CLUSTER,
+                          containerInstances=[container_instance_id],
+                          status='DRAINING'
+                      )
+                      
+                      # Wait for tasks to drain with timeout
+                      wait_for_tasks_to_drain(container_instance_id)
+                  
+                  # Complete the lifecycle action
+                  logger.info(f"Completing lifecycle action for instance {instance_id}")
+                  autoscaling.complete_lifecycle_action(
+                      LifecycleHookName=lifecycle_hook_name,
+                      AutoScalingGroupName=asg_name,
+                      LifecycleActionToken=lifecycle_action_token,
+                      LifecycleActionResult='CONTINUE'
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': f'Successfully drained instance {instance_id}'
+                  }
+                  
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}")
+                  raise e
+
+          def get_container_instance_id(instance_id):
+              """Get the ECS container instance ID for the given EC2 instance ID"""
+              try:
+                  # List container instances in the cluster
+                  list_response = ecs.list_container_instances(cluster=CLUSTER)
+                  
+                  if not list_response['containerInstanceArns']:
+                      logger.info(f"No container instances found in cluster {CLUSTER}")
+                      return None
+                  
+                  # Describe container instances to get EC2 instance ID mapping
+                  describe_response = ecs.describe_container_instances(
+                      cluster=CLUSTER,
+                      containerInstances=list_response['containerInstanceArns']
+                  )
+                  
+                  # Find the container instance with matching EC2 instance ID
+                  for container_instance in describe_response['containerInstances']:
+                      if container_instance['ec2InstanceId'] == instance_id:
+                          return container_instance['containerInstanceArn']
+                  
+                  logger.info(f"No container instance found for EC2 instance {instance_id}")
+                  return None
+                  
+              except Exception as e:
+                  logger.error(f"Error getting container instance ID: {str(e)}")
+                  return None
+
+          def wait_for_tasks_to_drain(container_instance_id):
+              """Wait for tasks to drain from the container instance"""
+              max_wait_time = 5 * 60  # 5 minutes
+              start_time = time.time()
+              
+              while (time.time() - start_time) < max_wait_time:
+                  # List tasks on the container instance
+                  tasks = ecs.list_tasks(
+                      cluster=CLUSTER,
+                      containerInstance=container_instance_id
+                  )
+                  
+                  task_count = len(tasks['taskArns'])
+                  logger.info(f"Container instance {container_instance_id} has {task_count} tasks remaining")
+                  
+                  if task_count == 0:
+                      logger.info("All tasks drained successfully")
+                      return True
+                  
+                  # Wait before checking again
+                  time.sleep(15)
+              
+              logger.warning(f"Timed out waiting for tasks to drain from {container_instance_id}")
+              return False
+
+  # Permission for EventBridge to invoke Lambda
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DrainECSInstancesFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LifecycleEventRule.Arn
+
+  # EventBridge rule to capture lifecycle events
+  LifecycleEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${AWS::StackName}-asg-termination-events
+      Description: "Capture Auto Scaling group termination events"
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Ref ECSAutoScalingGroupName
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DrainECSInstancesFunction.Arn
+          Id: "DrainECSInstancesFunction"
+
+  # Auto Scaling Lifecycle Hook
+  TerminationLifecycleHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref ECSAutoScalingGroupName
+      DefaultResult: ABANDON
+      HeartbeatTimeout: 900
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      LifecycleHookName: !Sub ${AWS::StackName}-instance-terminating-hook
+
+Outputs:
+  DrainECSInstancesFunction:
+    Description: Lambda function that drains ECS tasks
+    Value: !GetAtt DrainECSInstancesFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-DrainECSInstancesFunction
+
+  LifecycleHookName:
+    Description: Name of the Auto Scaling Lifecycle Hook
+    Value: !Ref TerminationLifecycleHook
+    Export:
+      Name: !Sub ${AWS::StackName}-LifecycleHookName

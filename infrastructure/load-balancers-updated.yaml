@@ -1,0 +1,170 @@
+Description: >
+  This template deploys an Application Load Balancer with enhanced security features,
+  including TLS 1.2+ support, security policies, and access logs.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+
+  VPC:
+    Description: Choose which VPC the Application Load Balancer should be deployed to
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Description: Choose which subnets the Application Load Balancer should be deployed to
+    Type: List<AWS::EC2::Subnet::Id>
+
+  SecurityGroup:
+    Description: Select the Security Group to apply to the Application Load Balancer
+    Type: AWS::EC2::SecurityGroup::Id
+
+  # Optional parameters
+  EnableAccessLogs:
+    Description: Enable ALB access logs
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+
+  AccessLogsBucket:
+    Description: S3 bucket for ALB access logs (leave blank to create a new bucket)
+    Type: String
+    Default: ""
+
+Resources:
+  # Create S3 bucket for ALB access logs if needed
+  AccessLogsBucketResource:
+    Type: AWS::S3::Bucket
+    Condition: CreateAccessLogsBucket
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: LogDeliveryWrite
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldLogs
+            Status: Enabled
+            ExpirationInDays: 90
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-alb-access-logs
+
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateAccessLogsBucket
+    Properties:
+      Bucket: !Ref AccessLogsBucketResource
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 's3:PutObject'
+            Resource: !Sub '${AccessLogsBucketResource.Arn}/AWSLogs/${AWS::AccountId}/*'
+          - Effect: Allow
+            Principal:
+              Service: delivery.logs.amazonaws.com
+            Action: 's3:PutObject'
+            Resource: !Sub '${AccessLogsBucketResource.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': 'bucket-owner-full-control'
+          - Effect: Allow
+            Principal:
+              Service: delivery.logs.amazonaws.com
+            Action: 's3:GetBucketAcl'
+            Resource: !Sub '${AccessLogsBucketResource.Arn}'
+
+  # Application Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${EnvironmentName}-alb
+      Subnets: !Ref Subnets
+      SecurityGroups:
+        - !Ref SecurityGroup
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - Key: routing.http2.enabled
+          Value: 'true'
+        - Key: deletion_protection.enabled
+          Value: 'false'
+        - Key: access_logs.s3.enabled
+          Value: !Ref EnableAccessLogs
+        - Key: access_logs.s3.bucket
+          Value: !If [CreateAccessLogsBucket, !Ref AccessLogsBucketResource, !Ref AccessLogsBucket]
+        - Key: access_logs.s3.prefix
+          Value: !Ref EnvironmentName
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-alb
+
+  # Default HTTP listener
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            ContentType: text/plain
+            MessageBody: "Not Found"
+            StatusCode: 404
+
+  # Default target group for health checks
+  DefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EnvironmentName}-default
+      VpcId: !Ref VPC
+      Port: 80
+      Protocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-default
+
+Conditions:
+  CreateAccessLogsBucket: !Equals [!Ref AccessLogsBucket, ""]
+
+Outputs:
+  LoadBalancer:
+    Description: A reference to the Application Load Balancer
+    Value: !Ref LoadBalancer
+    Export:
+      Name: !Sub ${EnvironmentName}-ALB
+
+  LoadBalancerUrl:
+    Description: The URL of the ALB
+    Value: !Sub http://${LoadBalancer.DNSName}
+    Export:
+      Name: !Sub ${EnvironmentName}-ALB-URL
+
+  Listener:
+    Description: A reference to the default HTTP listener
+    Value: !Ref LoadBalancerListener
+    Export:
+      Name: !Sub ${EnvironmentName}-ALB-Listener
