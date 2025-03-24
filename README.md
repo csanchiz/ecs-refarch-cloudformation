@@ -1,254 +1,249 @@
-![build-status](https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiKzBuNjJCUFk2STRvbDZENXlMUFJOenF2V2EyQ3FMbEtuWDlQeVp6TWlxdXhNMGVOZGo5bG9jdTl1YU16RmZIVVNxa3VqTVg3V3drSnJxOUQwSmhqV2g0PSIsIml2UGFyYW1ldGVyU3BlYyI6IlJJRE4wZGJaS25LL0s0dzkiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
-
 # Deploying Microservices with Amazon ECS, AWS CloudFormation, and an Application Load Balancer
 
-This reference architecture provides a set of YAML templates for deploying microservices to [Amazon EC2 Container Service (Amazon ECS)](http://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html) with [AWS CloudFormation](https://aws.amazon.com/cloudformation/).
-
-You can launch this CloudFormation stack in your account:
-
-| AWS Region | Short name | | 
-| -- | -- | -- |
-| US East (Ohio) | us-east-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US East (N. Virginia) | us-east-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US GovCloud | us-gov-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.amazonaws-us-gov.com/cloudformation/home?region=us-gov-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US West (Oregon) | us-west-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US West (N. California) | us-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Canada (Central) | ca-central-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Paris) | eu-west-3 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-3#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (London) | eu-west-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Ireland) | eu-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Frankfurt) | eu-central-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Seoul) | ap-northeast-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Tokyo) | ap-northeast-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Sydney) | ap-southeast-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Singapore) | ap-southeast-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Mumbai) | ap-south-1 |  [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| South America (São Paulo) | sa-east-1 |  [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
+This reference architecture provides a set of YAML templates for deploying microservices to [Amazon Elastic Container Service (Amazon ECS)](https://aws.amazon.com/ecs/) with [AWS CloudFormation](https://aws.amazon.com/cloudformation/).
 
 ## Overview
 
 ![infrastructure-overview](images/architecture-overview.png)
 
-The repository consists of a set of nested templates that deploy the following:
+This repository contains a set of nested CloudFormation templates that deploy the following:
 
- - A tiered [VPC](http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_Introduction.html) with public and private subnets, spanning an AWS region.
- - A highly available ECS cluster deployed across two [Availability Zones](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html) in an [Auto Scaling](https://aws.amazon.com/autoscaling/) group and that are AWS SSM enabled.
- - A pair of [NAT gateways](http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-nat-gateway.html) (one in each zone) to handle outbound traffic.
- - Two interconnecting microservices deployed as [ECS services](http://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html) (website-service and product-service). 
- - An [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/applicationloadbalancer/) to the public subnets to handle inbound traffic.
- - ALB path-based routes for each ECS service to route the inbound traffic to the correct service.
- - Centralized container logging with [Amazon CloudWatch Logs](http://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html).
- - A [Lambda Function](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) and [Auto Scaling Lifecycle Hook](https://docs.aws.amazon.com/autoscaling/ec2/userguide/lifecycle-hooks.html) to [drain Tasks from your Container Instances](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/container-instance-draining.html) when an Instance is selected for Termination in your Auto Scaling Group.
+- A tiered [VPC](https://aws.amazon.com/vpc/) with public and private subnets, spanning two Availability Zones
+- A highly available ECS cluster using both EC2 and Fargate launch types with Graviton processors
+- [ECS Capacity Providers](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-capacity-providers.html) for EC2 and Fargate with auto-scaling capabilities
+- A mix of On-Demand and Spot instances for cost optimization
+- [VPC Endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints.html) for AWS services to improve security and reduce data transfer costs
+- A pair of [NAT Gateways](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html) (one in each zone) to handle outbound traffic
+- Two example microservices deployed as [ECS services](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html):
+  - A product service running on AWS Fargate with ARM64 architecture
+  - A website service running on EC2 container instances with ARM64 architecture
+- An [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) with path-based routing
+- Centralized container logging with [Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html)
+- [Container Insights](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights.html) for monitoring and troubleshooting
+- A [Lambda Function](https://aws.amazon.com/lambda/) and [Auto Scaling Lifecycle Hook](https://docs.aws.amazon.com/autoscaling/ec2/userguide/lifecycle-hooks.html) to drain tasks from container instances during scale-in events
+
+## Cost Optimization with AWS Graviton
+
+This reference architecture uses AWS Graviton-based instances which provide:
+
+- Up to 40% better price/performance compared to equivalent x86-based instances
+- Up to 20% lower cost for the same performance
+- Reduced carbon footprint with better energy efficiency
+- Native support for ARM64 architecture
+
+The templates are configured to use:
+- t4g.medium for development environments (replacing t3.medium)
+- m6g.large for production environments (replacing m5.large)
+
+When using this architecture, ensure your container images support the ARM64 architecture. Most popular container images now provide multi-architecture support through Docker manifests.
+
 ## Why use AWS CloudFormation with Amazon ECS?
 
-Using CloudFormation to deploy and manage services with ECS has a number of nice benefits over more traditional methods ([AWS CLI](https://aws.amazon.com/cli), scripting, etc.). 
+Using CloudFormation to deploy and manage services with ECS has several benefits:
 
-#### Infrastructure-as-Code
+### Infrastructure-as-Code
 
-A template can be used repeatedly to create identical copies of the same stack (or to use as a foundation to start a new stack).  Templates are simple YAML- or JSON-formatted text files that can be placed under your normal source control mechanisms, stored in private or public locations such as Amazon S3, and exchanged via email. With CloudFormation, you can see exactly which AWS resources make up a stack. You retain full control and have the ability to modify any of the AWS resources created as part of a stack. 
+Templates can be used repeatedly to create identical copies of the same stack. Templates are simple YAML-formatted text files that can be placed under source control, stored in S3, and shared between teams. With CloudFormation, you can see exactly which AWS resources make up your stack and maintain full control over them.
 
-#### Self-documenting 
+### Self-documenting
 
-Fed up with outdated documentation on your infrastructure or environments? Still keep manual documentation of IP ranges, security group rules, etc.?
+With CloudFormation, your template becomes your documentation. Want to see exactly what you have deployed? Just look at your template. If you keep it in source control, you can also track changes over time.
 
-With CloudFormation, your template becomes your documentation. Want to see exactly what you have deployed? Just look at your template. If you keep it in source control, then you can also look back at exactly which changes were made and by whom.
+### Intelligent updating & rollback
 
-#### Intelligent updating & rollback
-
-CloudFormation not only handles the initial deployment of your infrastructure and environments, but it can also manage the whole lifecycle, including future updates. During updates, you have fine-grained control and visibility over how changes are applied, using functionality such as [change sets](https://aws.amazon.com/blogs/aws/new-change-sets-for-aws-cloudformation/), [rolling update policies](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-updatepolicy.html) and [stack policies](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/protect-stack-resources.html).
+CloudFormation handles the entire lifecycle of your infrastructure, including updates. During updates, you have fine-grained control over how changes are applied, using features like [change sets](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks-changesets.html), [rolling update policies](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-updatepolicy.html), and [stack policies](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/protect-stack-resources.html).
 
 ## Template details
 
-The templates below are included in this repository and reference architecture:
+The templates below are included in this repository:
 
 | Template | Description |
-| --- | --- | 
-| [master.yaml](master.yaml) | This is the master template - deploy it to CloudFormation and it includes all of the others automatically. |
-| [infrastructure/vpc.yaml](infrastructure/vpc.yaml) | This template deploys a VPC with a pair of public and private subnets spread across two Availability Zones. It deploys an [Internet gateway](http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_Internet_Gateway.html), with a default route on the public subnets. It deploys a pair of NAT gateways (one in each zone), and default routes for them in the private subnets. |
-| [infrastructure/security-groups.yaml](infrastructure/security-groups.yaml) | This template contains the [security groups](http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_SecurityGroups.html) required by the entire stack. They are created in a separate nested template, so that they can be referenced by all of the other nested templates. |
-| [infrastructure/load-balancers.yaml](infrastructure/load-balancers.yaml) | This template deploys an ALB to the public subnets, which exposes the various ECS services. It is created in in a separate nested template, so that it can be referenced by all of the other nested templates and so that the various ECS services can register with it. |
-| [infrastructure/ecs-cluster.yaml](infrastructure/ecs-cluster.yaml) | This template deploys an ECS cluster to the private subnets using an Auto Scaling group and installs the AWS SSM agent with related policy requirements. |
-| [infrastructure/lifecyclehook.yaml](infrastructure/lifecyclehook.yaml) | This template deploys a Lambda Function and Auto Scaling Lifecycle Hook to drain Tasks from your Container Instances when an Instance is selected for Termination in your Auto Scaling Group.
-| [services/product-service/service.yaml](services/product-service/service.yaml) | This is an example of a long-running ECS service that serves a JSON API of products. For the full source for the service, see [services/product-service/src](services/product-service/src).|
-| [services/website-service/service.yaml](services/website-service/service.yaml) | This is an example of a long-running ECS service that needs to connect to another service (product-service) via the load-balanced URL. We use an environment variable to pass the product-service URL to the containers. For the full source for this service, see [services/website-service/src](services/website-service/src). |
+| --- | --- |
+| [master-updated.yaml](master-updated.yaml) | This is the master template - deploy it to CloudFormation and it includes all of the others automatically. |
+| [infrastructure/vpc-updated.yaml](infrastructure/vpc-updated.yaml) | This template deploys a VPC with public and private subnets, Internet and NAT gateways, and VPC endpoints for AWS services. |
+| [infrastructure/security-groups-updated.yaml](infrastructure/security-groups-updated.yaml) | This template contains the security groups required by the entire stack. |
+| [infrastructure/load-balancers-updated.yaml](infrastructure/load-balancers-updated.yaml) | This template deploys an ALB with enhanced security features and access logs. |
+| [infrastructure/ecs-cluster-updated.yaml](infrastructure/ecs-cluster-updated.yaml) | This template deploys an ECS cluster with both EC2 and Fargate capacity providers using Graviton processors. |
+| [infrastructure/lifecyclehook-updated.yaml](infrastructure/lifecyclehook-updated.yaml) | This template deploys a Lambda function and Auto Scaling Lifecycle Hook to drain tasks from container instances during termination. |
+| [services/product-service/service-fargate.yaml](services/product-service/service-fargate.yaml) | This is an example of a containerized service running on AWS Fargate with ARM64 architecture. |
+| [services/website-service/service-updated.yaml](services/website-service/service-updated.yaml) | This is an example of a containerized service running on EC2 container instances with ARM64 architecture. |
 
-After the CloudFormation templates have been deployed, the [stack outputs](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html) contain a link to the load-balanced URLs for each of the deployed microservices.
+After the CloudFormation templates have been deployed, the [stack outputs](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html) contain links to the load-balanced URLs for each of the deployed microservices.
 
-![stack-outputs](images/stack-outputs.png)
+## AWS CDK Implementation
 
-The ECS instances should also appear in the Managed Instances section of the EC2 console.
+This repository also includes an AWS CDK implementation of the same architecture in the `cdk` directory. The CDK implementation provides:
+
+- TypeScript-based infrastructure as code
+- Strong typing and compile-time error checking
+- Better IDE support with auto-completion
+- Reusable components
+- Built-in testing framework
+
+To use the CDK implementation:
+
+```bash
+cd cdk
+npm install
+npm run build
+cdk deploy EcsRefarchDev  # For development environment
+cdk deploy EcsRefarchProd  # For production environment
+```
+
+See the [CDK README](cdk/README.md) for more details.
 
 ## How do I...?
 
 ### Get started and deploy this into my AWS account
 
-You can launch this CloudFormation stack in your account:
-
-| AWS Region | Short name | | 
-| -- | -- | -- |
-| US East (Ohio) | us-east-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US East (N. Virginia) | us-east-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US GovCloud | us-gov-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.amazonaws-us-gov.com/cloudformation/home?region=us-gov-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US West (Oregon) | us-west-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| US West (N. California) | us-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Canada (Central) | ca-central-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Frankfurt) | eu-west-3 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-3#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (London) | eu-west-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Ireland) | eu-west-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| EU (Frankfurt) | eu-central-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Seoul) | ap-northeast-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Tokyo) | ap-northeast-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Sydney) | ap-southeast-2 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Singapore) | ap-southeast-1 | [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| Asia Pacific (Mumbai) | ap-south-1 |  [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
-| South America (São Paulo) | sa-east-1 |  [![cloudformation-launch-button](images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=Production&templateURL=https://s3.amazonaws.com/ecs-refarch-cloudformation/master.yaml) |
+1. Clone this repository to your local machine
+2. Upload the templates to an S3 bucket in your account
+3. Deploy the master-updated.yaml template via the AWS CloudFormation console or AWS CLI
 
 ### Customize the templates
 
-1. [Fork](https://github.com/awslabs/ecs-refarch-cloudformation#fork-destination-box) this GitHub repository.
-2. Clone the forked GitHub repository to your local machine.
-3. Modify the templates.
-4. Upload them to an Amazon S3 bucket of your choice.
-5. Either create a new CloudFormation stack by deploying the master.yaml template, or update your existing stack with your version of the templates.
+1. Fork this GitHub repository
+2. Clone the forked repository to your local machine
+3. Modify the templates according to your requirements
+4. Upload them to an Amazon S3 bucket
+5. Deploy the master-updated.yaml template, or update your existing stack
 
 ### Create a new ECS service
 
-1. Push your container to a registry somewhere (e.g., [Amazon ECR](https://aws.amazon.com/ecr/)).
-2. Copy one of the existing service templates in [services/*](/services).
-3. Update the `ContainerName` and `Image` parameters to point to your container image instead of the example container.
-4. Increment the `ListenerRule` priority number (no two services can have the same priority number - this is used to order the ALB path based routing rules).
-5. Copy one of the existing service definitions in [master.yaml](master.yaml) and point it at your new service template. Specify the HTTP `Path` at which you want the service exposed. 
-6. Deploy the templates as a new stack, or as an update to an existing stack.
+1. Push your container image to a registry (e.g., [Amazon ECR](https://aws.amazon.com/ecr/))
+   - Make sure your image supports ARM64 architecture for Graviton compatibility
+   - Consider using multi-architecture images for maximum flexibility
+2. Copy one of the existing service templates (service-fargate.yaml for Fargate or service-updated.yaml for EC2)
+3. Update the `ContainerImage` parameter to point to your container image
+4. Adjust the CPU, memory, and other parameters as needed
+5. Add the service to the master-updated.yaml template
+6. Deploy or update your CloudFormation stack
 
 ### Setup centralized container logging
 
-By default, the containers in your ECS tasks/services are already configured to send log information to CloudWatch Logs and retain them for 365 days. Within each service's template (in [services/*](services/)), a LogGroup is created that is named after the CloudFormation stack. All container logs are sent to that CloudWatch Logs log group.
+Container logging is already configured in the service templates. Logs are sent to CloudWatch Logs with a 30-day retention period. You can view the logs in the [CloudWatch Logs console](https://console.aws.amazon.com/cloudwatch/home?#logs:).
 
-You can view the logs by looking in your [CloudWatch Logs console](https://console.aws.amazon.com/cloudwatch/home?#logs:) (make sure you are in the correct AWS region).
+To use a different logging solution:
 
-ECS also supports other logging drivers, including `syslog`, `journald`, `splunk`, `gelf`, `json-file`, and `fluentd`. To configure those instead, adjust the service template to use the alternative `LogDriver`. You can also adjust the log retention period from the default 365 days by tweaking the `RetentionInDays` parameter.
+1. Modify the `LogConfiguration` section in the task definition
+2. ECS supports various logging drivers including `awslogs`, `splunk`, `fluentd`, and others
+3. Update the retention period by changing the `RetentionInDays` parameter in the `CloudWatchLogsGroup` resource
 
-For more information, see the [LogConfiguration](http://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html) API operation.
+### Change the instance types for the ECS cluster
 
-### Change the ECS host instance type
+The instance types are defined in the `EnvironmentConfiguration` mapping in the master-updated.yaml template:
 
-This is specified in the [master.yaml](master.yaml) template.
-
-By default, [t2.large](https://aws.amazon.com/ec2/instance-types/) instances are used, but you can change this by modifying the following section:
-
-```
-ECS:
-  Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: ...
-      Parameters:
-        ... 
-        InstanceType: t2.large
-        InstanceCount: 4
-        ... 
-```
-
-### Adjust the Auto Scaling parameters for ECS hosts and services
-
-The Auto Scaling group scaling policy provided by default launches and maintains a cluster of 4 ECS hosts distributed across two Availability Zones (min: 4, max: 4, desired: 4).
-
-It is ***not*** set up to scale automatically based on any policies (CPU, network, time of day, etc.). 
-  
-If you would like to configure policy or time-based automatic scaling, you can add the [ScalingPolicy](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-as-policy.html) property to the AutoScalingGroup deployed in [infrastructure/ecs-cluster.yaml](infrastructure/ecs-cluster.yaml#L69).
-
-As well as configuring Auto Scaling for the ECS hosts (your pool of compute), you can also configure scaling each individual ECS service. This can be useful if you want to run more instances of each container/task depending on the load or time of day (or a custom CloudWatch metric). To do this, you need to create [AWS::ApplicationAutoScaling::ScalingPolicy](http://docs.aws.amazon.com/pt_br/AWSCloudFormation/latest/UserGuide/aws-resource-applicationautoscaling-scalingpolicy.html) within your service template.
-
-### Deploy multiple environments (e.g., dev, test, pre-production)
-
-Deploy another CloudFormation stack from the same set of templates to create a new environment. The stack name provided when deploying the stack is prefixed to all taggable resources (e.g., EC2 instances, VPCs, etc.) so you can distinguish the different environment resources in the AWS Management Console. 
-
-### Change the VPC or subnet IP ranges
-
-This set of templates deploys the following network design:
-
-| Item | CIDR Range | Usable IPs | Description |
-| --- | --- | --- | --- |
-| VPC | 10.180.0.0/16 | 65,536 | The whole range used for the VPC and all subnets |
-| Public Subnet | 10.180.8.0/21 | 2,041 | The public subnet in the first Availability Zone |
-| Public Subnet | 10.180.16.0/21 | 2,041 | The public subnet in the second Availability Zone |
-| Private Subnet | 10.180.24.0/21 | 2,041 | The private subnet in the first Availability Zone |
-| Private Subnet | 10.180.32.0/21 | 2,041 | The private subnet in the second Availability Zone |
-
-You can adjust the CIDR ranges used in this section of the [master.yaml](master.yaml) template:
-
-```
-VPC:
-  Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub ${TemplateLocation}/infrastructure/vpc.yaml
-      Parameters:
-        EnvironmentName:    !Ref AWS::StackName
-        VpcCIDR:            10.180.0.0/16
-        PublicSubnet1CIDR:  10.180.8.0/21
-        PublicSubnet2CIDR:  10.180.16.0/21
-        PrivateSubnet1CIDR: 10.180.24.0/21
-        PrivateSubnet2CIDR: 10.180.32.0/21
+```yaml
+Mappings:
+  EnvironmentConfiguration:
+    Development:
+      InstanceType: t4g.medium    # Graviton2-based instance
+      ClusterSize: 2
+    Production:
+      InstanceType: m6g.large     # Graviton2-based instance
+      ClusterSize: 4
+    SpotConfiguration:
+      InstanceTypes:
+        - c6g.large
+        - r6g.large
+        - t4g.large
 ```
 
-### Update an ECS service to a new Docker image version
+You can modify these values or add additional environment types as needed. All instance types use Graviton processors for better price/performance and energy efficiency.
 
-ECS has the ability to perform rolling upgrades to your ECS services to minimize downtime during deployments. For more information, see [Updating a Service](http://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service.html).
+### Configure auto-scaling for ECS services
 
-To update one of your services to a new version, adjust the `Image` parameter in the service template (in [services/*](services/) to point to the new version of your container image. For example, if `1.0.0` was currently deployed and you wanted to update to `1.1.0`, you could update it as follows:
+Auto-scaling is already configured for the services using target tracking scaling policies based on CPU utilization and request count. You can adjust the target values and scaling parameters in the service templates.
 
+For more advanced scaling configurations:
+
+1. Modify the `ScalableTarget` and scaling policy resources in the service templates
+2. Add additional metrics or alarms for scaling
+3. Implement scheduled scaling for predictable workloads
+
+### Deploy multiple environments (e.g., dev, test, production)
+
+Deploy multiple CloudFormation stacks from the same set of templates, using different stack names and parameters:
+
+```bash
+# Deploy development environment
+aws cloudformation deploy \
+  --template-file master-updated.yaml \
+  --stack-name dev-ecs-microservices \
+  --parameter-overrides EnvironmentType=Development
+
+# Deploy production environment
+aws cloudformation deploy \
+  --template-file master-updated.yaml \
+  --stack-name prod-ecs-microservices \
+  --parameter-overrides EnvironmentType=Production
 ```
-TaskDefinition:
-  Type: AWS::ECS::TaskDefinition
-  Properties:
-    ContainerDefinitions:
-      - Name: your-container
-        Image: registry.example.com/your-container:1.1.0
-```
 
-After you've updated the template, update the deployed CloudFormation stack; CloudFormation and ECS handle the rest. 
+### Use AWS Fargate for all services
 
-To adjust the rollout parameters (min/max number of tasks/containers to keep in service at any time), you need to configure `DeploymentConfiguration` for the ECS service.
+To use AWS Fargate exclusively:
 
-For example:
+1. Remove the EC2 capacity provider from the ECS cluster template
+2. Convert all service templates to use the Fargate launch type
+3. Update the default capacity provider strategy in the ECS cluster template
 
-```
-Service: 
+### Implement blue/green deployments
+
+To implement blue/green deployments:
+
+1. Use [AWS CodeDeploy](https://aws.amazon.com/codedeploy/) with ECS
+2. Add a `DeploymentController` to your ECS service:
+
+```yaml
+Service:
   Type: AWS::ECS::Service
-    Properties: 
-      ...
-      DesiredCount: 4
-      DeploymentConfiguration: 
-        MaximumPercent: 200
-        MinimumHealthyPercent: 50
+  Properties:
+    DeploymentController:
+      Type: CODE_DEPLOY
+    # Other properties...
 ```
 
-### Use the SSM Run Command function to see details in the ECS instances
+3. Create the necessary CodeDeploy resources (application, deployment group, etc.)
 
-The AWS SSM Run Command function, in the EC2 console, can be used to execute commands at the shell on the ECS instances. These can be helpful for examining the installed configuration of the instances without requiring direct access to them.
+## Security best practices
 
-### Spot Instances and the Hibernate Agent.
+This reference architecture implements several security best practices:
 
-In order to use Spot with this template, you will need to enable ```SpotPrice``` under the ```AWS::AutoScaling::LaunchConfiguration``` or add in ```AWS::EC2::SpotFleet``` support.  To fully use Hibernation with Spot instances, please review [Spot Instance Interruptions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-interruptions.html).
+- **Network segmentation**: Resources are deployed in private subnets where possible
+- **Least privilege**: IAM roles follow the principle of least privilege
+- **Security groups**: Traffic is restricted between components
+- **VPC endpoints**: AWS services can be accessed without traversing the internet
+- **Container security**: Tasks use separate execution and task roles
+- **Logging and monitoring**: Container logs and metrics are collected centrally
 
+## Testing
 
-### Add a new item to this list
+The repository includes a comprehensive testing framework in the `tests` directory:
 
-If you found yourself wishing this set of frequently asked questions had an answer for a particular problem, please [submit a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/). The chances are that others will also benefit from having the answer listed here.
+- Unit tests for validating CloudFormation templates
+- Integration tests using TaskCat
+- CloudFormation linting with cfn-lint
+
+To run the tests:
+
+```bash
+./tests/run_tests.sh
+```
+
+See the [Testing README](tests/README.md) for more details.
 
 ## Contributing
 
-Please [create a new GitHub issue](https://github.com/awslabs/ecs-refarch-cloudformation/issues/new) for any feature requests, bugs, or documentation improvements. 
+Please [create a new GitHub issue](https://github.com/awslabs/ecs-refarch-cloudformation/issues/new) for any feature requests, bugs, or documentation improvements.
 
-Where possible, please also [submit a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/) for the change. 
+Where possible, please also [submit a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/) for the change.
 
 ## License
 
-Copyright 2011-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2011-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
 
 [http://aws.amazon.com/apache2.0/](http://aws.amazon.com/apache2.0/)
 
 or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-

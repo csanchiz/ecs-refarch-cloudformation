@@ -1,38 +1,30 @@
-Description: >
-  This template deploys a modern ECS architecture with Graviton-based instances for better
-  cost efficiency and sustainability. It includes both EC2 and Fargate launch types,
-  with support for ARM64 architecture.
-
-  Last Modified: March 2025
-  Original Author: Paul Maddox <pmaddox@amazon.com>
-  Updated By: Amazon Q
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Reference Architecture: Create a highly available ECS cluster with Graviton processors for better price/performance.'
 
 Parameters:
   EnvironmentType:
-    Description: The type of environment to deploy (determines capacity and instance types)
+    Description: 'Specify the Environment type of the stack (Development/Production).'
     Type: String
     Default: Development
     AllowedValues:
       - Development
       - Production
-    ConstraintDescription: Must be Development or Production
+    ConstraintDescription: 'Specify either Development or Production.'
+
+  TemplateLocation:
+    Description: 'S3 bucket path where the templates are stored.'
+    Type: String
+    Default: https://s3.amazonaws.com/ecs-refarch-cloudformation
 
 Mappings:
   EnvironmentConfiguration:
     Development:
-      # Graviton2-based instances for better price/performance
-      InstanceType: t4g.medium
+      InstanceType: t4g.medium    # Graviton2-based instance
       ClusterSize: 2
-      FargateTaskCpu: 256
-      FargateTaskMemory: 512
     Production:
-      # Graviton2-based instances for production workloads
-      InstanceType: m6g.large
+      InstanceType: m6g.large     # Graviton2-based instance
       ClusterSize: 4
-      FargateTaskCpu: 512
-      FargateTaskMemory: 1024
     SpotConfiguration:
-      # Additional Graviton instance types for spot fleet diversity
       InstanceTypes:
         - c6g.large
         - r6g.large
@@ -42,19 +34,19 @@ Resources:
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: infrastructure/vpc-updated.yaml
+      TemplateURL: !Sub ${TemplateLocation}/infrastructure/vpc-updated.yaml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         VpcCIDR: 10.180.0.0/16
-        PublicSubnet1CIDR: 10.180.8.0/24
-        PublicSubnet2CIDR: 10.180.9.0/24
-        PrivateSubnet1CIDR: 10.180.16.0/24
-        PrivateSubnet2CIDR: 10.180.17.0/24
+        PublicSubnet1CIDR: 10.180.8.0/21
+        PublicSubnet2CIDR: 10.180.16.0/21
+        PrivateSubnet1CIDR: 10.180.24.0/21
+        PrivateSubnet2CIDR: 10.180.32.0/21
 
   SecurityGroups:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: infrastructure/security-groups-updated.yaml
+      TemplateURL: !Sub ${TemplateLocation}/infrastructure/security-groups-updated.yaml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         VPC: !GetAtt VPC.Outputs.VPC
@@ -62,17 +54,17 @@ Resources:
   ALB:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: infrastructure/load-balancers-updated.yaml
+      TemplateURL: !Sub ${TemplateLocation}/infrastructure/load-balancers-updated.yaml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         VPC: !GetAtt VPC.Outputs.VPC
         Subnets: !GetAtt VPC.Outputs.PublicSubnets
         SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
 
-  ECSCluster:
+  ECS:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: infrastructure/ecs-cluster-updated.yaml
+      TemplateURL: !Sub ${TemplateLocation}/infrastructure/ecs-cluster-updated.yaml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         InstanceType: !FindInMap [EnvironmentConfiguration, !Ref EnvironmentType, InstanceType]
@@ -80,71 +72,53 @@ Resources:
         VPC: !GetAtt VPC.Outputs.VPC
         SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-        SpotInstanceTypes: !Join 
-          - ','
-          - !FindInMap [EnvironmentConfiguration, SpotConfiguration, InstanceTypes]
-
-  # Example of a Fargate-based service optimized for ARM64
-  ProductServiceFargate:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: services/product-service/service-fargate.yaml
-      Parameters:
-        VPC: !GetAtt VPC.Outputs.VPC
-        Cluster: !GetAtt ECSCluster.Outputs.Cluster
-        DesiredCount: 2
-        Listener: !GetAtt ALB.Outputs.Listener
-        Path: /products
-        TaskCpu: !FindInMap [EnvironmentConfiguration, !Ref EnvironmentType, FargateTaskCpu]
-        TaskMemory: !FindInMap [EnvironmentConfiguration, !Ref EnvironmentType, FargateTaskMemory]
-        Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-        SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSServiceSecurityGroup
-        Architecture: ARM64
-
-  # Example of an EC2-based service on Graviton
-  WebsiteService:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: services/website-service/service-updated.yaml
-      Parameters:
-        VPC: !GetAtt VPC.Outputs.VPC
-        Cluster: !GetAtt ECSCluster.Outputs.Cluster
-        DesiredCount: 2
-        ProductServiceUrl: !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "products"]]
-        Listener: !GetAtt ALB.Outputs.Listener
-        Path: /
-        ECSServiceAutoScalingRoleARN: !GetAtt ECSCluster.Outputs.ECSServiceAutoScalingRole
-        Architecture: ARM64
+        SpotInstanceTypes: !Join [",", !FindInMap [EnvironmentConfiguration, SpotConfiguration, InstanceTypes]]
 
   LifecycleHook:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: infrastructure/lifecyclehook-updated.yaml
+      TemplateURL: !Sub ${TemplateLocation}/infrastructure/lifecyclehook-updated.yaml
       Parameters:
-        Cluster: !GetAtt ECSCluster.Outputs.Cluster
-        ECSAutoScalingGroupName: !GetAtt ECSCluster.Outputs.ECSAutoScalingGroupName
+        EnvironmentName: !Ref AWS::StackName
+        ClusterName: !GetAtt ECS.Outputs.Cluster
+        AutoScalingGroupName: !GetAtt ECS.Outputs.AutoScalingGroup
+
+  ProductService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateLocation}/services/product-service/service-fargate.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt ECS.Outputs.Cluster
+        DesiredCount: 2
+        Listener: !GetAtt ALB.Outputs.Listener
+        Path: /products*
+        ECSServiceAutoScalingRoleARN: !GetAtt ECS.Outputs.ECSServiceAutoScalingRole
+        Architecture: ARM64
+
+  WebsiteService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateLocation}/services/website-service/service-updated.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt ECS.Outputs.Cluster
+        DesiredCount: 2
+        ProductServiceUrl: !Join ['', ['http://', !GetAtt ALB.Outputs.LoadBalancerUrl, '/products']]
+        Listener: !GetAtt ALB.Outputs.Listener
+        Path: /
+        ECSServiceAutoScalingRoleARN: !GetAtt ECS.Outputs.ECSServiceAutoScalingRole
+        Architecture: ARM64
 
 Outputs:
   ProductServiceUrl:
-    Description: The URL endpoint for the product service
-    Value: !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "products"]]
-    Export:
-      Name: !Sub ${AWS::StackName}-ProductServiceUrl
+    Description: URL of the product service
+    Value: !Join ['', ['http://', !GetAtt ALB.Outputs.LoadBalancerUrl, '/products']]
 
   WebsiteServiceUrl:
-    Description: The URL endpoint for the website service
-    Value: !Join ["", [!GetAtt ALB.Outputs.LoadBalancerUrl, "/"]]
-    Export:
-      Name: !Sub ${AWS::StackName}-WebsiteServiceUrl
-  
-  ClusterName:
-    Description: The name of the ECS cluster
-    Value: !GetAtt ECSCluster.Outputs.Cluster
-    Export:
-      Name: !Sub ${AWS::StackName}-ClusterName
+    Description: URL of the website service
+    Value: !Join ['', ['http://', !GetAtt ALB.Outputs.LoadBalancerUrl, '/']]
 
   Architecture:
-    Description: The CPU architecture being used (ARM64 - Graviton)
+    Description: CPU architecture being used
     Value: ARM64
-    Export:
-      Name: !Sub ${AWS::StackName}-Architecture
